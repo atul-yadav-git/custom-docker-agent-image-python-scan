@@ -1,0 +1,35 @@
+# Stage 1: Build stage
+FROM python:3.9-slim AS builder
+
+# Install system dependencies and Python packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libffi-dev && \
+    pip install --upgrade pip && \
+    pip install bandit pip-audit flake8 pytest && \
+    apt-get remove --purge -y gcc libffi-dev && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Stage 2: Final image
+FROM python:3.9-slim
+
+# Create a non-root user
+RUN useradd -m appuser
+
+# Set the working directory
+WORKDIR /app
+
+# Copy necessary packages from the builder stage to the final image
+COPY --from=builder /usr/local/bin/bandit /usr/local/bin/
+COPY --from=builder /usr/local/bin/pip-audit /usr/local/bin/
+COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
+
+# Change ownership of the /app directory
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser
+
+# Set the entrypoint or command to run your application or scans
+CMD ["bash"]
+
